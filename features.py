@@ -8,14 +8,12 @@ SUSPICIOUS_BRANDS = [
     'bank', 'secure', 'login', 'verify', 'account', 'update', 'signin', 'support'
 ]
 
-# TLDs highly overrepresented in active phishing attacks
 HIGH_RISK_TLDS = {
     'xyz', 'top', 'sbs', 'online', 'club', 'site', 'buzz', 'icu', 
     'monster', 'tk', 'ml', 'ga', 'cf', 'gq', 'fit', 'rest', 'work'
 }
 
 def calculate_shannon_entropy(text):
-    """Calculates the uncertainty/randomness of characters in a string."""
     if not text:
         return 0.0
     entropy = 0.0
@@ -27,11 +25,13 @@ def calculate_shannon_entropy(text):
     return float(entropy)
 
 def extract_features(url):
-    """Extracts 18 advanced structural, mathematical, and heuristic features."""
+    """
+    Extracts numerical features and decomposes the URL into clean domain and path components.
+    """
     features = {}
     url_str = str(url).strip()
     
-    # 1. Structural Lengths
+    # 1. Structural lengths
     features['url_length'] = len(url_str)
     
     # 2. Character counts
@@ -47,7 +47,7 @@ def extract_features(url):
     # 3. Protocol security
     features['is_https'] = 1 if url_str.startswith('https://') else 0
 
-    # 4. Domain & Path Decomposition
+    # 4. Domain & Path decomposition
     try:
         parsed = urllib.parse.urlparse(url_str if '://' in url_str else 'http://' + url_str)
         domain = parsed.netloc.lower() if parsed.netloc else parsed.path.lower().split('/')[0]
@@ -64,24 +64,38 @@ def extract_features(url):
     features['domain_entropy'] = calculate_shannon_entropy(domain)
     features['url_entropy'] = calculate_shannon_entropy(url_str)
 
-    # 6. Linguistic indicators (DGA Detection)
+    # 6. Linguistic indicators (DGA detection)
     vowels = sum(c in 'aeiou' for c in domain)
     consonants = sum(c.isalpha() and c not in 'aeiou' for c in domain)
     features['domain_vowel_ratio'] = vowels / max(1, (vowels + consonants))
     features['domain_digit_ratio'] = sum(c.isdigit() for c in domain) / max(1, len(domain))
 
-    # 7. Suspicious TLD & Brand Spoofing
+       # 7. Suspicious TLD Check
     domain_parts = domain.split('.')
     tld = domain_parts[-1] if len(domain_parts) > 1 else ""
     features['is_suspicious_tld'] = 1 if tld in HIGH_RISK_TLDS else 0
 
-    root_domain = ".".join(domain_parts[-2:]) if len(domain_parts) >= 2 else domain
+    # 8. True Brand Spoofing Check (Only looks at SUBDOMAINS, ignores normal path /login)
+    # Extracts everything before the root domain (e.g. in 'paypal.evil.com', subdomain is 'paypal')
+    subdomain_str = ".".join(domain_parts[:-2]) if len(domain_parts) > 2 else ""
+    
+    # We strip common technical prefixes like 'www', 'm', 'app'
+    clean_subdomain = re.sub(r'^(www\d?|m|app)\.?', '', subdomain_str)
+    
+    # Flag ONLY if a protected brand name appears inside an alien subdomain
     features['has_brand_spoofing'] = 1 if any(
-        (b in domain or b in path) and (b not in root_domain) for b in SUSPICIOUS_BRANDS
+        brand in clean_subdomain for brand in SUSPICIOUS_BRANDS
     ) else 0
 
-    # 8. Raw IPv4 Domain Check
+
+    # 8. Raw IPv4 domain check
     ip_pattern = r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$'
     features['is_ip_domain'] = 1 if re.match(ip_pattern, domain) else 0
 
     return features, domain, path
+
+if __name__ == '__main__':
+    feats, d, p = extract_features("https://limites-gold.my.canva.site/update")
+    print("Domain:", d)
+    print("Path:", p)
+    print("Features extracted:", len(feats))
