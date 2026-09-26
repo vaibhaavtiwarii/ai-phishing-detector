@@ -1,8 +1,7 @@
 import streamlit as st
 import joblib
 import pandas as pd
-import numpy as np
-from features import extract_features  # We import our lexical feature engine!
+from features import extract_features  # Import your upgraded feature engine!
 
 # --- 1. SET UP THE PAGE ---
 st.set_page_config(
@@ -11,10 +10,11 @@ st.set_page_config(
     layout="centered"
 )
 
-# --- 2. LOAD OUR TRAINED MODEL ---
+# --- 2. LOAD OUR REAL-WORLD MODEL ---
 @st.cache_resource
 def load_model():
-    return joblib.load("phishing_model.pkl")
+    # Load the brand new, 15-feature real-world model
+    return joblib.load("phishing_model_real.pkl")
 
 try:
     model = load_model()
@@ -26,8 +26,8 @@ except Exception as e:
 # --- 3. TITLE & DESCRIPTION ---
 st.title("🛡️ AI-Powered Phishing Threat Detection Engine")
 st.markdown("""
-This engine uses a **Random Forest Classifier** to analyze URLs in real-time.
-Paste a URL below to run our hybrid lexical feature extractor and evaluate its risk score.
+This engine uses a **Real-World Random Forest Classifier** trained on 20,000+ raw, active web addresses.
+Paste any URL below to run our hybrid lexical feature extractor and calculate its real threat score.
 """)
 st.write("---")
 
@@ -43,53 +43,35 @@ if model_loaded:
         if not user_url.strip():
             st.warning("Please enter a valid URL first!")
         else:
-            # Step A: Extract live lexical features
+            # Step A: Extract live lexical features from raw user URL
             raw_features = extract_features(user_url)
 
             with st.expander("🔍 Extracted URL Lexical Indicators"):
                 st.write(raw_features)
 
-            # Step B: Map extracted features to the 30-feature schema
-            feature_values = np.ones(30)  # Default to 1 (safe)
+            # Step B: Prepare features to match the exact 15-feature structure of the new model
+            # Construct a DataFrame with the exact same keys returned by features.py
+            prediction_df = pd.DataFrame([raw_features])
 
-            # --- SMARTER MAPPING LOGIC ---
-            feature_values[0] = -1 if raw_features['has_ip'] else 1
-            feature_values[1] = -1 if raw_features['url_length'] >= 54 else (0 if 40 <= raw_features['url_length'] < 54 else 1)
-            feature_values[5] = -1 if raw_features['count_hyphens'] > 0 else 1
-            feature_values[6] = -1 if raw_features['domain_dots'] >= 3 else (0 if raw_features['domain_dots'] == 2 else 1)
-            feature_values[7] = 1 if raw_features['is_https'] else -1
-
-            # --- THE FIX FOR THE WARNING ---
-            # Define the exact 30 feature names the model was trained on
-            feature_names = [
-                'having_IP_Address', 'URL_Length', 'Shortining_Service', 'having_At_Symbol',
-                'double_slash_redirecting', 'Prefix_Suffix', 'having_Sub_Domain', 'SSLfinal_State',
-                'Domain_registeration_length', 'Favicon', 'port', 'HTTPS_token', 'Request_URL',
-                'URL_of_Anchor', 'Links_in_tags', 'SFH', 'Submitting_to_email', 'Abnormal_URL',
-                'Redirect', 'on_mouseover', 'RightClick', 'popUpWidnow', 'Iframe', 'age_of_domain',
-                'DNSRecord', 'web_traffic', 'Page_Rank', 'Google_Index', 'Links_pointing_to_page',
-                'Statistical_report'
-            ]
-
-            # Construct a single-row DataFrame with the correct feature names
-            prediction_df = pd.DataFrame([feature_values], columns=feature_names)
-
-            # Step C: Run prediction cleanly with the named DataFrame
+            # Step C: Run Scikit-learn Prediction cleanly with matching schema
             prediction = model.predict(prediction_df)[0]
             probabilities = model.predict_proba(prediction_df)[0]
-            phishing_risk = probabilities[0] * 100
+
+            # In the new model: Index 0 is Legitimate (0), Index 1 is Phishing (1)
+            phishing_risk = probabilities[1] * 100
 
             st.write("---")
             st.subheader("📊 Audit Assessment Results")
 
-            if prediction == -1 or phishing_risk > 40:
+            # We trigger an alert if the model predicts Phishing (1) OR if the calculated risk exceeds 50%
+            if prediction == 1 or phishing_risk > 50:
                 st.error(f"🚨 **ALERT: High Phishing Risk Detected!**")
                 st.metric(label="Calculated Phishing Risk Score", value=f"{phishing_risk:.1f}%")
                 st.progress(int(phishing_risk))
                 st.warning("""
                 ⚠️ **Security Analyst Recommendation:**
-                * Do **NOT** input any credentials or personal information on this page.
-                * The URL contains anomalies like suspicious domain padding or unsecured transfer protocols.
+                * Do **NOT** input any credentials, tokens, or personal information on this page.
+                * This address displays classic social-engineering lexical features (e.g., suspicious keyword structures, unusual domain depth, or hyphen-padding).
                 """)
             else:
                 st.success("✅ **STATUS: Website Appears Legitimate**")
@@ -97,6 +79,6 @@ if model_loaded:
                 st.progress(int(phishing_risk))
                 st.info("""
                 🛡️ **Security Auditor Note:**
-                * The URL metrics align with standard safe web structures.
-                * Always double-check domain spellings manually.
+                * The URL structure exhibits standard benign traits.
+                * Always manually double-check domain spellings in the address bar before logging in.
                 """)
