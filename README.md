@@ -55,8 +55,9 @@ Traditional machine learning classifiers evaluate uniform character counts acros
                                        ▼
                          🎯 Real-Time Threat Score (<3ms)
 
-                    ``` 
-            ---    
+        ``` 
+        
+  ```
 
 **1. Dual-Engine Character-Level NLP**
 Domain Engine (3,000 tokens): Isolates the Fully Qualified Domain Name (FQDN) using character 2-grams through 4-grams to detect subtle typosquatting and brand impersonation (e.g., paypa1, secure-login).
@@ -75,7 +76,7 @@ High-Risk TLD Penalties: Dynamically penalizes top-level domains statistically o
 **3. LightGBM Gradient Boosting**
 Migrated from static Random Forests to Microsoft LightGBM (300 estimators, 63 leaves). Unlike independent decision trees, gradient boosting builds sequential trees where each subsequent tree optimizes the residual errors of preceding iterations.
 
-
+---
 
 #### ⚡ Concurrency & Performance Benchmarks
 Feature Extraction Throughput: ~25,000 URLs/sec via Python concurrent.futures multiprocessing utilizing all available CPU cores.
@@ -108,6 +109,6 @@ streamlit run app.py
 
 
 ##### 📜 License
-Distributed under the MIT License. See LICENSE for more information.
+Distributed under the MIT License. See [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) for more information.
 
 
