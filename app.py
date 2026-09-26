@@ -2,7 +2,7 @@ import streamlit as st
 import joblib
 import pandas as pd
 from scipy.sparse import hstack
-from features import extract_features  # Imports your lexical feature engine!
+from features import extract_features  # Imports your upgraded lexical engine!
 
 # --- 1. SET UP THE PAGE ---
 st.set_page_config(
@@ -14,13 +14,14 @@ st.set_page_config(
 # --- 2. LOAD OUR HYBRID PIPELINE ARTIFACTS ---
 @st.cache_resource
 def load_pipeline():
-    # Loads the classifier, vectorizer, and lexical columns
+    # Loads the LightGBM classifier, dual vectorizers, and lexical columns
     return joblib.load("phishing_hybrid_pipeline.pkl")
 
 try:
     pipeline = load_pipeline()
     model = pipeline['model']
-    vectorizer = pipeline['vectorizer']
+    vec_domain = pipeline['vec_domain']
+    vec_path = pipeline['vec_path']
     lexical_columns = pipeline['lexical_columns']
     pipeline_loaded = True
 except Exception as e:
@@ -30,8 +31,8 @@ except Exception as e:
 # --- 3. TITLE & DESCRIPTION ---
 st.title("🛡️ AI-Powered Phishing Threat Detection Engine")
 st.markdown("""
-This engine uses an **Industry-Grade Hybrid NLP + Lexical Classifier** trained on 30,000+ active web addresses.
-It analyzes structural patterns and computes character-level TF-IDF (3-grams to 5-grams) in real-time.
+This engine uses an **Industry-Grade Dual-Engine LightGBM Classifier** trained on 120,000+ active web addresses.
+It splits URLs to run dedicated Domain and Path TF-IDF pipelines alongside 18 high-fidelity lexical indicators.
 """)
 st.write("---")
 
@@ -47,26 +48,29 @@ if pipeline_loaded:
         if not user_url.strip():
             st.warning("Please enter a valid URL first!")
         else:
-            with st.spinner("Analyzing threat vectors..."):
-                # --- Step A: NLP Feature Extraction ---
-                # Run the URL text through our fitted character TF-IDF vectorizer
-                url_tfidf = vectorizer.transform([user_url])
-
-                # --- Step B: Lexical Feature Extraction ---
-                raw_lexical = extract_features(user_url)
+            with st.spinner("Decomposing URL and auditing threat matrices..."):
+                # Step A: Run Upgraded Lexical Extraction & URL Decomposition
+                raw_lexical, domain_str, path_str = extract_features(user_url)
                 
                 # Show extracted features in an expander for analyst review
-                with st.expander("🔍 Extracted URL Lexical Indicators"):
-                    st.write(raw_lexical)
+                with st.expander("🔍 Extracted URL Structural & Entropy Indicators"):
+                    st.write({
+                        "domain": domain_str,
+                        "path": path_str,
+                        **raw_lexical
+                    })
+
+                # Step B: Run Dual TF-IDF Engines
+                domain_tfidf = vec_domain.transform([domain_str])
+                path_tfidf = vec_path.transform([path_str])
 
                 # Convert lexical features to DataFrame in the correct order
                 lexical_df = pd.DataFrame([raw_lexical])[lexical_columns].fillna(0)
 
-                # --- Step C: Fuse NLP + Lexical Features ---
-                # Fuses the sparse TF-IDF matrix with the dense lexical array
-                fused_features = hstack([url_tfidf, lexical_df.values]).tocsr()
+                # Step C: Fuse Domain Tokens + Path Tokens + Structural Features
+                fused_features = hstack([domain_tfidf, path_tfidf, lexical_df.values]).tocsr()
 
-                # --- Step D: Run Prediction ---
+                # Step D: Run LightGBM Prediction
                 prediction = model.predict(fused_features)[0]
                 probabilities = model.predict_proba(fused_features)[0]
 
