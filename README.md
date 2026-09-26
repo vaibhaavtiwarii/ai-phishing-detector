@@ -34,6 +34,7 @@ Legitimate (0)     0.9578    0.9680    0.9629      9000
 
 ### 🧠 Architectural Evolution & Breakthroughs
 Traditional machine learning classifiers evaluate uniform character counts across an entire URL string, diluting localized threat indicators. This engine implements a multi-tiered feature decomposition pipeline:
+```text
                               [ Raw Incoming URL ]
                                        │
            ┌───────────────────────────┴───────────────────────────┐
@@ -73,6 +74,8 @@ High-Risk TLD Penalties: Dynamically penalizes top-level domains statistically o
 3. LightGBM Gradient Boosting
 Migrated from static Random Forests to Microsoft LightGBM (300 estimators, 63 leaves). Unlike independent decision trees, gradient boosting builds sequential trees where each subsequent tree optimizes the residual errors of preceding iterations.
 
+```
+
 ⚡ Concurrency & Performance Benchmarks
 Feature Extraction Throughput: ~25,000 URLs/sec via Python concurrent.futures multiprocessing utilizing all available CPU cores.
 
@@ -101,10 +104,10 @@ bash
 pip install pandas numpy scikit-learn lightgbm streamlit joblib scipy
 4. Execute Pipeline & App
 bash
-# 1. Retrain the model on 120,000 balanced raw URLs
+1. Retrain the model on 120,000 balanced raw URLs
 python train.py
 
-# 2. Launch the interactive Security Operations Dashboard
+2. Launch the interactive Security Operations Dashboard
 streamlit run app.py
 
 
