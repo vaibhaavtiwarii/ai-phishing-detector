@@ -29,6 +29,8 @@ Legitimate (0)     0.9578    0.9680    0.9629      9000
      macro avg     0.9627    0.9627    0.9627     18000
   weighted avg     0.9627    0.9627    0.9627     18000
 
+  ```
+
 
 ### 🧠 Architectural Evolution & Breakthroughs
 Traditional machine learning classifiers evaluate uniform character counts across an entire URL string, diluting localized threat indicators. This engine implements a multi-tiered feature decomposition pipeline:
@@ -51,6 +53,8 @@ Traditional machine learning classifiers evaluate uniform character counts acros
                                        │
                                        ▼
                          🎯 Real-Time Threat Score (<3ms)
+
+                         
 
 1. Dual-Engine Character-Level NLP
 Domain Engine (3,000 tokens): Isolates the Fully Qualified Domain Name (FQDN) using character 2-grams through 4-grams to detect subtle typosquatting and brand impersonation (e.g., paypa1, secure-login).
@@ -106,4 +110,3 @@ streamlit run app.py
 
 ##### 📜 License
 Distributed under the MIT License. See LICENSE for more information.
-'@

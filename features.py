@@ -8,12 +8,14 @@ SUSPICIOUS_BRANDS = [
     'bank', 'secure', 'login', 'verify', 'account', 'update', 'signin', 'support'
 ]
 
+# TLDs highly overrepresented in active phishing attacks
 HIGH_RISK_TLDS = {
     'xyz', 'top', 'sbs', 'online', 'club', 'site', 'buzz', 'icu', 
     'monster', 'tk', 'ml', 'ga', 'cf', 'gq', 'fit', 'rest', 'work'
 }
 
 def calculate_shannon_entropy(text):
+    """Calculates the uncertainty/randomness of characters in a string."""
     if not text:
         return 0.0
     entropy = 0.0
@@ -25,13 +27,11 @@ def calculate_shannon_entropy(text):
     return float(entropy)
 
 def extract_features(url):
-    """
-    Extracts numerical features and decomposes the URL into clean domain and path components.
-    """
+    """Extracts 18 advanced structural, mathematical, and heuristic features."""
     features = {}
     url_str = str(url).strip()
     
-    # 1. Structural lengths
+    # 1. Structural Lengths
     features['url_length'] = len(url_str)
     
     # 2. Character counts
@@ -47,7 +47,7 @@ def extract_features(url):
     # 3. Protocol security
     features['is_https'] = 1 if url_str.startswith('https://') else 0
 
-    # 4. Domain & Path decomposition
+    # 4. Domain & Path Decomposition
     try:
         parsed = urllib.parse.urlparse(url_str if '://' in url_str else 'http://' + url_str)
         domain = parsed.netloc.lower() if parsed.netloc else parsed.path.lower().split('/')[0]
@@ -64,7 +64,7 @@ def extract_features(url):
     features['domain_entropy'] = calculate_shannon_entropy(domain)
     features['url_entropy'] = calculate_shannon_entropy(url_str)
 
-    # 6. Linguistic indicators (DGA detection)
+    # 6. Linguistic indicators (DGA Detection)
     vowels = sum(c in 'aeiou' for c in domain)
     consonants = sum(c.isalpha() and c not in 'aeiou' for c in domain)
     features['domain_vowel_ratio'] = vowels / max(1, (vowels + consonants))
@@ -80,14 +80,8 @@ def extract_features(url):
         (b in domain or b in path) and (b not in root_domain) for b in SUSPICIOUS_BRANDS
     ) else 0
 
-    # 8. Raw IPv4 domain check
+    # 8. Raw IPv4 Domain Check
     ip_pattern = r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$'
     features['is_ip_domain'] = 1 if re.match(ip_pattern, domain) else 0
 
     return features, domain, path
-
-if __name__ == '__main__':
-    feats, d, p = extract_features("https://limites-gold.my.canva.site/update")
-    print("Domain:", d)
-    print("Path:", p)
-    print("Features extracted:", len(feats))
