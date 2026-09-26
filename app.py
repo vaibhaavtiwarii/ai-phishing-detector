@@ -26,7 +26,7 @@ except Exception as e:
 # --- 3. TITLE & DESCRIPTION ---
 st.title("🛡️ AI-Powered Phishing Threat Detection Engine")
 st.markdown("""
-This engine uses a **Random Forest Classifier** to analyze URLs in real-time. 
+This engine uses a **Random Forest Classifier** to analyze URLs in real-time.
 Paste a URL below to run our hybrid lexical feature extractor and evaluate its risk score.
 """)
 st.write("---")
@@ -43,47 +43,40 @@ if model_loaded:
         if not user_url.strip():
             st.warning("Please enter a valid URL first!")
         else:
-            # Step A: Extract live lexical features using features.py
+            # Step A: Extract live lexical features
             raw_features = extract_features(user_url)
 
             with st.expander("🔍 Extracted URL Lexical Indicators"):
                 st.write(raw_features)
 
-            # Step B: Map extracted features to the 30-feature schema expected by the model
-            feature_values = np.ones(30) # Default to 1 (safe) for unextracted features
+            # Step B: Map extracted features to the 30-feature schema
+            feature_values = np.ones(30)  # Default to 1 (safe)
 
-            # ---- NEW, SMARTER MAPPING LOGIC ----
-            # having_IP_Address (Index 0)
+            # --- SMARTER MAPPING LOGIC ---
             feature_values[0] = -1 if raw_features['has_ip'] else 1
-            # URL_Length (Index 1) - More sensitive thresholds
             feature_values[1] = -1 if raw_features['url_length'] >= 54 else (0 if 40 <= raw_features['url_length'] < 54 else 1)
-            # Prefix_Suffix (Index 5) - Checks for dashes
             feature_values[5] = -1 if raw_features['count_hyphens'] > 0 else 1
-            # having_Sub_Domain (Index 6) - More sensitive logic for multiple domains
             feature_values[6] = -1 if raw_features['domain_dots'] >= 3 else (0 if raw_features['domain_dots'] == 2 else 1)
-            # SSLfinal_State (Index 7) - Check for HTTPS
             feature_values[7] = 1 if raw_features['is_https'] else -1
 
-            # --- THE FIX ---
-            # Define the exact 30 training feature names the model expects
+            # --- THE FIX FOR THE WARNING ---
+            # Define the exact 30 feature names the model was trained on
             feature_names = [
-                'having_IP_Address', 'URL_Length', 'Shortining_Service', 'having_At_Symbol', 
-                'double_slash_redirecting', 'Prefix_Suffix', 'having_Sub_Domain', 'SSLfinal_State', 
-                'Domain_registeration_length', 'Favicon', 'port', 'HTTPS_token', 'Request_URL', 
-                'URL_of_Anchor', 'Links_in_tags', 'SFH', 'Submitting_to_email', 'Abnormal_URL', 
-                'Redirect', 'on_mouseover', 'RightClick', 'popUpWidnow', 'Iframe', 'age_of_domain', 
-                'DNSRecord', 'web_traffic', 'Page_Rank', 'Google_Index', 'Links_pointing_to_page', 
+                'having_IP_Address', 'URL_Length', 'Shortining_Service', 'having_At_Symbol',
+                'double_slash_redirecting', 'Prefix_Suffix', 'having_Sub_Domain', 'SSLfinal_State',
+                'Domain_registeration_length', 'Favicon', 'port', 'HTTPS_token', 'Request_URL',
+                'URL_of_Anchor', 'Links_in_tags', 'SFH', 'Submitting_to_email', 'Abnormal_URL',
+                'Redirect', 'on_mouseover', 'RightClick', 'popUpWidnow', 'Iframe', 'age_of_domain',
+                'DNSRecord', 'web_traffic', 'Page_Rank', 'Google_Index', 'Links_pointing_to_page',
                 'Statistical_report'
             ]
 
             # Construct a single-row DataFrame with the correct feature names
             prediction_df = pd.DataFrame([feature_values], columns=feature_names)
 
-            # Step C: Run Scikit-learn Prediction cleanly with feature names
+            # Step C: Run prediction cleanly with the named DataFrame
             prediction = model.predict(prediction_df)[0]
             probabilities = model.predict_proba(prediction_df)[0]
-
-            # Calculate risk percentage of phishing (class labeled -1 at index 0)
             phishing_risk = probabilities[0] * 100
 
             st.write("---")
