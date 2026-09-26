@@ -1,91 +1,126 @@
 import pandas as pd
 import numpy as np
-import urllib.request
 import os
+import time
+from concurrent.futures import ProcessPoolExecutor
+import multiprocessing
+from scipy.sparse import hstack
+import joblib
+
 from features import extract_features
 from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import classification_report, accuracy_score
-import joblib
-import warnings
+from sklearn.metrics import classification_report, accuracy_score, roc_auc_score
 
-# Suppress warnings for a cleaner output
-warnings.filterwarnings("ignore", category=UserWarning)
-
-# --- 1. DATASET INFORMATION ---
 DATA_FILENAME = "raw_urldata.csv"
-DATAURL = "https://raw.githubusercontent.com/somanivihar1498/Detect-Malicious-URL-Using-logistic-regression/master/urldata.csv"
 
-def download_data():
-    if not os.path.exists(DATA_FILENAME):
-        print("📥 Downloading raw URL dataset...")
-        try:
-            urllib.request.urlretrieve(DATAURL, DATA_FILENAME)
-            print("✅ Download complete!")
-        except Exception as e:
-            print(f"❌ Error downloading file: {e}")
-            return False
-    else:
-        print("📦 Raw URL dataset already exists locally.")
-    return True
+def extract_single_url(url):
+    """Fast lexical feature extraction."""
+    try:
+        return extract_features(str(url))
+    except Exception:
+        return {}
 
-if download_data():
-    # --- 2. LOAD AND PARSE DATA ---
-    print("📖 Loading and parsing raw URLs...")
+def main():
+    print("=" * 65)
+    print("🛡️ STATE-OF-THE-ART HYBRID NLP + LEXICAL PHISHING ENGINE")
+    print("=" * 65)
+
+    # --- 1. LOAD DATASET ---
+    print("\n📖 Loading dataset from local CSV...")
     df = pd.read_csv(DATA_FILENAME)
-    
-    # Rename columns to a standard format ('url', 'label')
     df.columns = ['url', 'label']
-
-    # Convert text labels 'good' and 'bad' to 0 and 1
     df['result'] = df['label'].apply(lambda x: 1 if str(x).lower() == 'bad' else 0)
-    
-    # Clean and keep only the necessary columns
     df = df[['url', 'result']].dropna().drop_duplicates()
 
-    # --- 3. CREATE A BALANCED SUBSAMPLE ---
+    # Balanced 30,000 URL subset (15k Phishing, 15k Benign)
+    # We use 30,000 samples to keep training extremely fast while maximizing accuracy!
     phish_samples = df[df['result'] == 1]
     benign_samples = df[df['result'] == 0]
+    target_per_class = min(15000, len(phish_samples), len(benign_samples))
 
-    print(f"Total available Phishing URLs in dataset: {len(phish_samples)}")
-    print(f"Total available Benign URLs in dataset: {len(benign_samples)}")
+    phish_sub = phish_samples.sample(n=target_per_class, random_state=42)
+    benign_sub = benign_samples.sample(n=target_per_class, random_state=42)
+    dataset = pd.concat([phish_sub, benign_sub]).sample(frac=1, random_state=42).reset_index(drop=True)
 
-    # Create a balanced set for training to prevent bias
-    n_samples = min(len(phish_samples), len(benign_samples), 10000) # Cap at 10k for speed
-    phish_subset = phish_samples.sample(n=n_samples, random_state=42)
-    benign_subset = benign_samples.sample(n=n_samples, random_state=42)
+    print(f"📊 Training corpus: {len(dataset):,} balanced URLs")
+
+
+    # --- 2. TRAIN / TEST SPLIT ---
+    X_train_raw, X_test_raw, y_train, y_test = train_test_split(
+        dataset['url'].astype(str),
+        dataset['result'].values,
+        test_size=0.2,
+        random_state=42,
+        stratify=dataset['result'].values
+    )
+
+    # --- 3. NLP CHARACTER N-GRAM TF-IDF ---
+    print("\n🔤 Computing Character-level TF-IDF (3-grams to 5-grams)...")
+    tfidf_start = time.time()
     
-    subset_df = pd.concat([phish_subset, benign_subset]).sample(frac=1, random_state=42).reset_index(drop=True)
-    print(f"📊 Processing a balanced set of {len(subset_df)} URLs...")
+    # Extract structural sub-word tokens
+    vectorizer = TfidfVectorizer(
+        analyzer='char',
+        ngram_range=(3, 5),
+        max_features=2500,  # Focus on the top 2,500 most decisive URL text tokens
+        sublinear_tf=True
+    )
 
-    # --- 4. EXTRACT FEATURES FROM RAW URLS ---
-    print("⚡ Extracting lexical features from URLs (this may take a minute)...")
-    feature_list = subset_df['url'].apply(extract_features)
-    features_df = pd.DataFrame(feature_list.tolist())
+    X_train_tfidf = vectorizer.fit_transform(X_train_raw)
+    X_test_tfidf = vectorizer.transform(X_test_raw)
+    print(f"✅ Generated 2,500 NLP n-gram features in {time.time() - tfidf_start:.1f}s")
+
+    # --- 4. PARALLEL LEXICAL FEATURE EXTRACTION ---
+    cores = multiprocessing.cpu_count()
+    print(f"\n⚡ Extracting 15 structural lexical features across {cores} CPU cores...")
+    lex_start = time.time()
+
+    with ProcessPoolExecutor(max_workers=cores) as executor:
+        train_lex = list(executor.map(extract_single_url, X_train_raw, chunksize=2000))
+        test_lex = list(executor.map(extract_single_url, X_test_raw, chunksize=2000))
+
+    X_train_lex_df = pd.DataFrame(train_lex).fillna(0)
+    X_test_lex_df = pd.DataFrame(test_lex).fillna(0)
+    print(f"✅ Lexical features extracted in {time.time() - lex_start:.1f}s")
+
+    # --- 5. FUSE MATRICES (NLP 2500 + LEXICAL 15 = 2515 FEATURES) ---
+    print("\n🔗 Fusing NLP tokens and structural indicators into hybrid matrix...")
+    X_train_fused = hstack([X_train_tfidf, X_train_lex_df.values]).tocsr()
+    X_test_fused = hstack([X_test_tfidf, X_test_lex_df.values]).tocsr()
+    print(f"✅ Fused Feature Shape: {X_train_fused.shape} total dimensions per URL")
+
+    # --- 6. TRAIN NON-LINEAR CLASSIFIER (Random Forest) ---
+    print("\n🌲 Training High-Capacity Random Forest Classifier (100 Trees)...")
+    model_start = time.time()
     
-    # Combine extracted features with the labels
-    processed_df = pd.concat([features_df, subset_df['result']], axis=1)
-    processed_df = processed_df.dropna()
-    print("✅ Feature extraction complete!")
+    # RandomForest handles unscaled features beautifully and excels at non-linear boundaries
+    clf = RandomForestClassifier(n_estimators=100, max_depth=20, n_jobs=-1, random_state=42)
+    clf.fit(X_train_fused, y_train)
+    print(f"✅ Training completed in {time.time() - model_start:.1f}s")
 
-    # --- 5. TRAIN THE REAL-WORLD MODEL ---
-    X = processed_df.drop(columns=['result'])
-    y = processed_df['result']
+    # --- 7. BENCHMARK & EVALUATION ---
+    y_pred = clf.predict(X_test_fused)
+    y_proba = clf.predict_proba(X_test_fused)[:, 1]
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
-    
-    print("\n🌲 Training the Real-World Random Forest Classifier...")
-    model = RandomForestClassifier(n_estimators=150, min_samples_split=5, random_state=42, n_jobs=-1)
-    model.fit(X_train, y_train)
-    print("✅ Training complete!")
+    acc = accuracy_score(y_test, y_pred)
+    roc = roc_auc_score(y_test, y_proba)
 
-    # --- 6. EVALUATE THE NEW MODEL ---
-    y_pred = model.predict(X_test)
-    accuracy = accuracy_score(y_test, y_pred)
-    print(f"\n🎯 Real-World Model Accuracy: {accuracy * 100:.2f}%")
-    print("\n📋 Classification Report:")
-    print(classification_report(y_test, y_pred, target_names=['Legitimate (0)', 'Phishing (1)']))
+    print("\n" + "=" * 65)
+    print(f"🎯 HYBRID MODEL TEST ACCURACY : {acc * 100:.2f}%")
+    print(f"📈 ROC-AUC SCORE             : {roc:.4f}")
+    print("=" * 65)
+    print("\n📋 Detailed Classification Report:")
+    print(classification_report(y_test, y_pred, target_names=['Legitimate (0)', 'Phishing (1)'], digits=4))
 
-    # --- 7. SAVE THE NEW, SMARTER MODEL ---
-    joblib.dump(model, "phishing_model_real.pkl")
-    print("\n💾 Saved new real-world model as 'phishing_model_real.pkl'!")
+      # --- 8. SAVE PIPELINE ARTIFACTS ---
+    artifacts = {
+        'model': clf,
+        'vectorizer': vectorizer,
+        'lexical_columns': list(X_train_lex_df.columns)
+    }
+    # compress=3 uses zlib compression to shrink the file by up to 90%!
+    joblib.dump(artifacts, "phishing_hybrid_pipeline.pkl", compress=3)
+
+    print("💾 Saved hybrid pipeline artifacts as 'phishing_hybrid_pipeline.pkl'!")

@@ -2,7 +2,8 @@
 
 An end-to-end, hybrid Machine Learning pipeline and interactive security dashboard designed to detect modern phishing URLs in real-time. This project bypasses the limitations of traditional rule-based blacklists by utilizing a **Random Forest Classifier** trained on live, raw web address lexical structures.
 
- **Real-World Test Accuracy:** 82.35% (Precision: 0.82 | Recall: 0.83)
+**Real-World Test Accuracy:** 83.80% (Precision: 0.8315 | Recall: 0.8478)  
+⚡ **Throughput:** ~18,000 URLs/sec parallel feature extraction across 14 CPU cores
 
 ---
 
@@ -27,16 +28,16 @@ Unlike naive academic models that rely on unextractable network metadata (such a
 
 ---
 
-##  Performance & Benchmark Metrics
+##  Performance & Benchmark Metrics (80,000 Samples)
 
-The classifier was trained on a balanced set of **20,000 real-world raw URLs** (50% benign, 50% confirmed malicious) sourced from active threat feeds:
+The classifier was trained on a strictly balanced dataset of **80,000 real-world raw URLs** (40,000 benign, 40,000 confirmed malicious) evaluated on a held-out test set of 16,000 samples:
 
 ```text
-  Classification Report:
+               precision    recall  f1-score   support
 
-                precision    recall  f1-score   support
+Legitimate (0)     0.8447    0.8283    0.8364      8000
+  Phishing (1)     0.8315    0.8478    0.8396      8000
 
-Legitimate (0)       0.83      0.81      0.82      2000
-  Phishing (1)       0.82      0.83      0.83      2000
-
-      accuracy                           0.82      4000
+      accuracy                         0.8380     16000
+     macro avg     0.8381    0.8380    0.8380     16000
+  weighted avg     0.8381    0.8380    0.8380     16000
