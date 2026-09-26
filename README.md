@@ -30,7 +30,7 @@ Legitimate (0)     0.9578    0.9680    0.9629      9000
   weighted avg     0.9627    0.9627    0.9627     18000
 
   ```
-
+---
 
 ### 🧠 Architectural Evolution & Breakthroughs
 Traditional machine learning classifiers evaluate uniform character counts across an entire URL string, diluting localized threat indicators. This engine implements a multi-tiered feature decomposition pipeline:
@@ -55,14 +55,15 @@ Traditional machine learning classifiers evaluate uniform character counts acros
                                        ▼
                          🎯 Real-Time Threat Score (<3ms)
 
-                         
+                    ``` 
+            ---    
 
-1. Dual-Engine Character-Level NLP
+**1. Dual-Engine Character-Level NLP**
 Domain Engine (3,000 tokens): Isolates the Fully Qualified Domain Name (FQDN) using character 2-grams through 4-grams to detect subtle typosquatting and brand impersonation (e.g., paypa1, secure-login).
 
 Path Engine (2,000 tokens): Evaluates URI paths using 3-grams through 5-grams to capture credential-harvesting endpoints (e.g., /wp-content/login.php, ?auth_token=).
 
-2. Information Theory & Heuristic Vectors
+**2. Information Theory & Heuristic Vectors**
 Shannon Information Entropy (H): Measures algorithmic randomness in domain strings to expose automated Domain Generation Algorithms (DGAs).
 
 Linguistic DGA Ratio: Analyzes vowel-to-consonant ratios to detect non-human, machine-generated subdomains.
@@ -71,36 +72,31 @@ Target Brand Hijacking: Identifies deceptive brand keywords hosted on legitimate
 
 High-Risk TLD Penalties: Dynamically penalizes top-level domains statistically overrepresented in phishing feeds (.sbs, .online, .top, .xyz).
 
-3. LightGBM Gradient Boosting
+**3. LightGBM Gradient Boosting**
 Migrated from static Random Forests to Microsoft LightGBM (300 estimators, 63 leaves). Unlike independent decision trees, gradient boosting builds sequential trees where each subsequent tree optimizes the residual errors of preceding iterations.
 
-```
 
-⚡ Concurrency & Performance Benchmarks
+
+#### ⚡ Concurrency & Performance Benchmarks
 Feature Extraction Throughput: ~25,000 URLs/sec via Python concurrent.futures multiprocessing utilizing all available CPU cores.
 
 Inference Latency: Sub-3 millisecond response times per URL, rendering the pipeline viable for real-time DNS filtering and inline email proxy inspection.
 
 Storage Footprint: Pipeline artifacts are compressed via Zlib (compress=3), packaging the 5,020-dimensional model into an optimized footprint under 30 MB.
 
+---
 
-#### 🛠️ Quickstart Installation & Local Setup
+
+##### 🛠️ Quickstart Installation & Local Setup
 1. Clone & Set Up Environment
- bash
 git clone https://github.com/vaibhaavtiwarii/ai-phishing-detector.git
 cd ai-phishing-detector
 python -m venv venv
 2. Activate Virtual Environment
-Windows (PowerShell):
+Windows (PowerShell):powershell.\venv\Scripts\activate
+macOS / Linux:source venv/bin/activate
 
-powershell
-.\venv\Scripts\activate
-macOS / Linux:
-
-bash
-source venv/bin/activate
 3. Install Dependencies
-bash
 pip install pandas numpy scikit-learn lightgbm streamlit joblib scipy
 4. Execute Pipeline & App
 bash
@@ -113,3 +109,5 @@ streamlit run app.py
 
 ##### 📜 License
 Distributed under the MIT License. See LICENSE for more information.
+
+
