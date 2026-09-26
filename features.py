@@ -70,7 +70,7 @@ def extract_features(url):
     features['domain_vowel_ratio'] = vowels / max(1, (vowels + consonants))
     features['domain_digit_ratio'] = sum(c.isdigit() for c in domain) / max(1, len(domain))
 
-       # 7. Suspicious TLD Check
+           # 7. Suspicious TLD Check
     domain_parts = domain.split('.')
     tld = domain_parts[-1] if len(domain_parts) > 1 else ""
     features['is_suspicious_tld'] = 1 if tld in HIGH_RISK_TLDS else 0
@@ -86,6 +86,7 @@ def extract_features(url):
     features['has_brand_spoofing'] = 1 if any(
         brand in clean_subdomain for brand in SUSPICIOUS_BRANDS
     ) else 0
+
 
 
     # 8. Raw IPv4 domain check
