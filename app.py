@@ -108,7 +108,7 @@ if pipeline_loaded:
 
                     if prediction == 1 or phishing_risk > 50:
                         st.error(f"🚨 **ALERT: High Phishing Risk Detected!**")
-                        st.metric(label="Calculated Phishing Risk Score", value=f"{phishing_risk:.1f}%")
+                       st.metric(label="Calculated Phishing Risk Score (%)", value=f"{phishing_risk:.1f}")
                         st.progress(int(phishing_risk))
                         st.warning("""
                         ⚠️ **Security Analyst Recommendation:**
@@ -117,7 +117,7 @@ if pipeline_loaded:
                         """)
                     else:
                         st.success("✅ **STATUS: Website Appears Legitimate**")
-                        st.metric(label="Calculated Phishing Risk Score", value=f"{phishing_risk:.1f}%")
+                        st.metric(label="Calculated Phishing Risk Score (%)", value=f"{phishing_risk:.1f}")
                         st.progress(int(phishing_risk))
                         st.info("""
                         🛡️ **Security Auditor Note:**
