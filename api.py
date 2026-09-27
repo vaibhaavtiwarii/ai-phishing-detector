@@ -122,3 +122,8 @@ def scan_url(request: ScanRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Inference error: {e}")
+
+# --- 3. EXECUTION WRAPPER ---
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=8000)
