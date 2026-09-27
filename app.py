@@ -12,8 +12,7 @@ st.set_page_config(
     layout="centered"
 )
 
-# --- 2. ENTERPRISE AUTHORITY ALLOWLIST (Top Verified Global Root Domains) ---
-# Commercial gateways (Cloudflare / Cisco) check verified authority root domains first
+# --- 2. ENTERPRISE AUTHORITY ALLOWLIST ---
 TOP_VERIFIED_ROOTS = {
     "facebook.com", "fb.com", "google.com", "google.co.in", "youtube.com",
     "microsoft.com", "apple.com", "amazon.com", "amazon.in", "netflix.com",
@@ -85,13 +84,14 @@ if pipeline_loaded:
                     st.write("---")
                     st.subheader("📊 Audit Assessment Results")
                     st.success("✅ **STATUS: Verified Global Authority (Zero Risk)**")
-                    st.metric(label="Calculated Phishing Risk Score", value="0.0%")
+                    st.metric(label="Calculated Phishing Risk Score (%)", value=0.0)
                     st.progress(0)
                     st.info(f"""
                     🛡️ **Enterprise Allowlist Protection:**
                     * **Verified Root Authority:** `{root_domain}` is recognized in the global trust registry.
                     * Bypasses probabilistic scoring to eliminate false alarms on trusted infrastructure.
                     """)
+                
                 else:
                     # --- TIER 2: DUAL-ENGINE LIGHTGBM MACHINE LEARNING INFERENCE ---
                     domain_tfidf = vec_domain.transform([domain_str])
@@ -101,28 +101,26 @@ if pipeline_loaded:
                     fused_features = hstack([domain_tfidf, path_tfidf, lexical_df.values]).tocsr()
                     prediction = model.predict(fused_features)[0]
                     probabilities = model.predict_proba(fused_features)[0]
-                    phishing_risk = probabilities * 100
+                    phishing_risk = probabilities[1] * 100
 
                     st.write("---")
                     st.subheader("📊 Audit Assessment Results")
 
-                                    # Set threshold: alert if predicted phishing (1) OR risk score > 50%
-                if prediction == 1 or phishing_risk > 50:
-                    st.error(f"🚨 **ALERT: High Phishing Risk Detected!**")
-                    st.metric(label="Calculated Phishing Risk Score (%)", value=f"{phishing_risk:.1f}")
-                    st.progress(int(phishing_risk))
-                    st.warning("""
-                    ⚠️ **Security Analyst Recommendation:**
-                    * Do **NOT** input any credentials or personal information on this page.
-                    * The URL contains anomalous character tokens or deceptive structural depth typical of credential theft.
-                    """)
-                else:
-                    st.success("✅ **STATUS: Website Appears Legitimate**")
-                    st.metric(label="Calculated Phishing Risk Score (%)", value=f"{phishing_risk:.1f}")
-                    st.progress(int(phishing_risk))
-                    st.info("""
-                    🛡️ **Security Auditor Note:**
-                    * The URL structure exhibits standard benign traits.
-                    * Always manually double-check domain spellings in the address bar before logging in.
-                    """)
-
+                    if prediction == 1 or phishing_risk > 50:
+                        st.error(f"🚨 **ALERT: High Phishing Risk Detected!**")
+                        st.metric(label="Calculated Phishing Risk Score (%)", value=float(f"{phishing_risk:.1f}"))
+                        st.progress(int(phishing_risk))
+                        st.warning("""
+                        ⚠️ **Security Analyst Recommendation:**
+                        * Do **NOT** input any credentials or personal information on this page.
+                        * The URL contains anomalous character tokens or deceptive structural depth typical of credential theft.
+                        """)
+                    else:
+                        st.success("✅ **STATUS: Website Appears Legitimate**")
+                        st.metric(label="Calculated Phishing Risk Score (%)", value=float(f"{phishing_risk:.1f}"))
+                        st.progress(int(phishing_risk))
+                        st.info("""
+                        🛡️ **Security Auditor Note:**
+                        * The URL structure exhibits standard benign traits.
+                        * Always manually double-check domain spellings in the address bar before logging in.
+                        """)
