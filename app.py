@@ -106,21 +106,23 @@ if pipeline_loaded:
                     st.write("---")
                     st.subheader("📊 Audit Assessment Results")
 
-                    if prediction == 1 or phishing_risk > 50:
-                        st.error(f"🚨 **ALERT: High Phishing Risk Detected!**")
-                       st.metric(label="Calculated Phishing Risk Score (%)", value=f"{phishing_risk:.1f}")
-                        st.progress(int(phishing_risk))
-                        st.warning("""
-                        ⚠️ **Security Analyst Recommendation:**
-                        * Do **NOT** input any credentials or personal information on this page.
-                        * The URL contains anomalous character tokens or deceptive structural depth typical of credential theft.
-                        """)
-                    else:
-                        st.success("✅ **STATUS: Website Appears Legitimate**")
-                        st.metric(label="Calculated Phishing Risk Score (%)", value=f"{phishing_risk:.1f}")
-                        st.progress(int(phishing_risk))
-                        st.info("""
-                        🛡️ **Security Auditor Note:**
-                        * The URL structure exhibits standard benign traits.
-                        * Always manually double-check domain spellings in the address bar before logging in.
-                        """)
+                                    # Set threshold: alert if predicted phishing (1) OR risk score > 50%
+                if prediction == 1 or phishing_risk > 50:
+                    st.error(f"🚨 **ALERT: High Phishing Risk Detected!**")
+                    st.metric(label="Calculated Phishing Risk Score (%)", value=f"{phishing_risk:.1f}")
+                    st.progress(int(phishing_risk))
+                    st.warning("""
+                    ⚠️ **Security Analyst Recommendation:**
+                    * Do **NOT** input any credentials or personal information on this page.
+                    * The URL contains anomalous character tokens or deceptive structural depth typical of credential theft.
+                    """)
+                else:
+                    st.success("✅ **STATUS: Website Appears Legitimate**")
+                    st.metric(label="Calculated Phishing Risk Score (%)", value=f"{phishing_risk:.1f}")
+                    st.progress(int(phishing_risk))
+                    st.info("""
+                    🛡️ **Security Auditor Note:**
+                    * The URL structure exhibits standard benign traits.
+                    * Always manually double-check domain spellings in the address bar before logging in.
+                    """)
+
