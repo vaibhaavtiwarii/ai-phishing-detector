@@ -3,6 +3,7 @@ import joblib
 import pandas as pd
 import urllib.parse
 from scipy.sparse import hstack
+from advisor import generate_security_advisory
 from features import extract_features
 
 # --- 1. SET UP THE PAGE ---
@@ -70,6 +71,7 @@ if pipeline_loaded:
             with st.spinner("Decomposing URL and auditing threat matrices..."):
                 raw_lexical, domain_str, path_str = extract_features(user_url)
                 root_domain = get_root_domain(user_url)
+                is_allowlisted = root_domain in TOP_VERIFIED_ROOTS
                 
                 with st.expander("🔍 Extracted URL Structural & Entropy Indicators"):
                     st.write({
@@ -79,21 +81,11 @@ if pipeline_loaded:
                         **raw_lexical
                     })
 
-                # --- TIER 1: VERIFIED AUTHORITY ALLOWLIST CHECK ---
-                if root_domain in TOP_VERIFIED_ROOTS:
-                    st.write("---")
-                    st.subheader("📊 Audit Assessment Results")
-                    st.success("✅ **STATUS: Verified Global Authority (Zero Risk)**")
-                    st.metric(label="Calculated Phishing Risk Score (%)", value=0.0)
-                    st.progress(0)
-                    st.info(f"""
-                    🛡️ **Enterprise Allowlist Protection:**
-                    * **Verified Root Authority:** `{root_domain}` is recognized in the global trust registry.
-                    * Bypasses probabilistic scoring to eliminate false alarms on trusted infrastructure.
-                    """)
-                
+                # --- EXTRACT THREAT CLASS & RISKS ---
+                if is_allowlisted:
+                    prediction = 0
+                    phishing_risk = 0.0
                 else:
-                    # --- TIER 2: DUAL-ENGINE LIGHTGBM MACHINE LEARNING INFERENCE ---
                     domain_tfidf = vec_domain.transform([domain_str])
                     path_tfidf = vec_path.transform([path_str])
                     lexical_df = pd.DataFrame([raw_lexical])[lexical_columns].fillna(0)
@@ -101,26 +93,46 @@ if pipeline_loaded:
                     fused_features = hstack([domain_tfidf, path_tfidf, lexical_df.values]).tocsr()
                     prediction = model.predict(fused_features)[0]
                     probabilities = model.predict_proba(fused_features)[0]
-                    phishing_risk = probabilities[1] * 100
+                    phishing_risk = float(probabilities[1] * 100)
 
-                    st.write("---")
-                    st.subheader("📊 Audit Assessment Results")
+                # --- TIER-BASED SECURITY ADVISORY GENERATOR ---
+                advisory = generate_security_advisory(
+                    url_str=user_url,
+                    is_phishing=(prediction == 1 or phishing_risk > 50),
+                    risk_score=phishing_risk,
+                    heuristics=raw_lexical,
+                    domain_str=domain_str,
+                    root_domain=root_domain,
+                    is_allowlisted=is_allowlisted
+                )
 
-                    if prediction == 1 or phishing_risk > 50:
-                        st.error(f"🚨 **ALERT: High Phishing Risk Detected!**")
-                        st.metric(label="Calculated Phishing Risk Score (%)", value=float(f"{phishing_risk:.1f}"))
-                        st.progress(int(phishing_risk))
-                        st.warning("""
-                        ⚠️ **Security Analyst Recommendation:**
-                        * Do **NOT** input any credentials or personal information on this page.
-                        * The URL contains anomalous character tokens or deceptive structural depth typical of credential theft.
-                        """)
-                    else:
-                        st.success("✅ **STATUS: Website Appears Legitimate**")
-                        st.metric(label="Calculated Phishing Risk Score (%)", value=float(f"{phishing_risk:.1f}"))
-                        st.progress(int(phishing_risk))
-                        st.info("""
-                        🛡️ **Security Auditor Note:**
-                        * The URL structure exhibits standard benign traits.
-                        * Always manually double-check domain spellings in the address bar before logging in.
-                        """)
+                st.write("---")
+                st.subheader(f"📊 Assessment: {advisory['threat_type']}")
+
+                if is_allowlisted:
+                    st.success("✅ **STATUS: Verified Global Authority**")
+                    st.metric(label="Calculated Phishing Risk Score (%)", value="0.0")
+                    st.progress(0)
+                elif prediction == 1 or phishing_risk > 50:
+                    st.error("🚨 **ALERT: Active Threat Detected**")
+                    st.metric(label="Calculated Phishing Risk Score (%)", value=f"{phishing_risk:.1f}")
+                    st.progress(int(phishing_risk))
+                else:
+                    st.success("✅ **STATUS: Low Risk Profile**")
+                    st.metric(label="Calculated Phishing Risk Score (%)", value=f"{phishing_risk:.1f}")
+                    st.progress(int(phishing_risk))
+
+                st.markdown(f"**Diagnostic Summary:** *{advisory['summary']}*")
+                st.write("---")
+
+                # Parallel Display Columns for Actions
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown("### 🟢 What To Do")
+                    for item in advisory['what_to_do']:
+                        st.markdown(f"* {item}")
+
+                with col2:
+                    st.markdown("### 🔴 What NOT To Do")
+                    for item in advisory['what_not_to_do']:
+                        st.markdown(f"* {item}")
