@@ -1,3 +1,8 @@
+[![Live Demo](https://img.shields.io/badge/Live_App-Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://ai-phishing-detector.streamlit.app)
+[![Cloud Gateway](https://img.shields.io/badge/Email_Guard-GitHub_Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/vaibhaavtiwarii/ai-phishing-detector/actions)
+[![Model Accuracy](https://img.shields.io/badge/Accuracy-96.27%25-brightgreen?style=for-the-badge)](https://github.com/vaibhaavtiwarii/ai-phishing-detector)
+
+
 # 🛡️ AI-Powered Phishing Threat Detection Engine (Dual-Engine LightGBM)
 
 An end-to-end, high-performance cybersecurity pipeline and interactive threat intelligence dashboard designed to classify phishing and malicious URLs in real-time. Built with a **Dual-Engine LightGBM Architecture** combining character-level NLP with lexical, mathematical, and heuristic indicators trained on **120,000 real-world URLs**.
@@ -89,6 +94,7 @@ Storage Footprint: Pipeline artifacts are compressed via Zlib (compress=3), pack
 
 
 ##### 🛠️ Quickstart Installation & Local Setup
+
 1. Clone & Set Up Environment
 git clone https://github.com/vaibhaavtiwarii/ai-phishing-detector.git
 cd ai-phishing-detector
