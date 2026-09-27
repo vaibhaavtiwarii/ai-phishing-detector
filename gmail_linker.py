@@ -1,7 +1,11 @@
 import imaplib
+import smtplib
 import email
 from email.header import decode_header
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 import re
+import os
 import urllib.parse
 import joblib
 import pandas as pd
@@ -10,10 +14,14 @@ from scipy.sparse import hstack
 from features import extract_features
 from advisor import generate_security_advisory
 
-# --- 1. CONFIGURATION ---
+# --- 1. CONFIGURATION (Cloud Secrets + Local Fallback) ---
 IMAP_SERVER = "imap.gmail.com"
-GMAIL_USER = "vaibhavt.7895@gmail.com"          # <-- Replace with your Gmail address
-GMAIL_APP_PASS = "giczzncpaqlkaluh" # <-- Replace with your 16-character App Password
+SMTP_SERVER = "smtp.gmail.com"
+SMTP_PORT = 465
+
+# Pulls securely from GitHub Actions secrets if running in the cloud, otherwise falls back to your local credentials
+GMAIL_USER = os.getenv("GMAIL_USER", "vaibhavt.7895@gmail.com")
+GMAIL_APP_PASS = os.getenv("GMAIL_APP_PASS", "giczzncpaqlkaluh")
 
 # Enterprise Authority Allowlist & Trusted CDNs
 TOP_VERIFIED_ROOTS = {
@@ -28,7 +36,7 @@ TOP_VERIFIED_ROOTS = {
     # Official Banking Authorities (State Bank of India)
     "sbi.co.in", "sbi.bank.in", "sbi.bank", "onlinesbi.sbi", "sbi",
     
-    # Trusted Global CDNs & Hosted Resource Domains (Added LinkedIn & Codecademy CDNs)
+    # Trusted Global CDNs & Hosted Resource Domains
     "gstatic.com", "googleapis.com", "googleusercontent.com", "google-analytics.com",
     "githubusercontent.com", "aws.amazon.com", "cloudfront.net", "akamaihd.net",
     "licdn.com", "media.licdn.com", "static.licdn.com", "github.githubassets.com",
@@ -38,8 +46,6 @@ TOP_VERIFIED_ROOTS = {
     "sparkpostmail.com", "sparkpostmail1.com", "sendgrid.net", "mailchimp.com",
     "codecademy.com", "links.codecademy.com"
 }
-
-
 
 def get_root_domain(url_str):
     try:
@@ -75,7 +81,10 @@ def audit_url(url_str):
             "is_phishing": False,
             "risk_score": 0.0,
             "tier": "Enterprise Allowlist",
-            "threat_type": "Verified Safe Asset"
+            "threat_type": "Verified Safe Asset",
+            "summary": f"Verified infrastructure parent domain '{root_domain}' is registered in our authority database.",
+            "what_to_do": ["Proceed with normal safe interaction."],
+            "what_not_to_do": ["No actions needed."]
         }
     
     # Tier 2: Machine Learning Inference
@@ -103,105 +112,4 @@ def audit_url(url_str):
         "url": url_str,
         "is_phishing": is_phish,
         "risk_score": round(risk, 2),
-        "tier": "LightGBM ML Classifier",
-        "threat_type": adv["threat_type"],
-        "summary": adv["summary"],
-        "what_not_to_do": adv["what_not_to_do"]
-    }
-
-def scan_inbox(max_emails=5):
-    """Connects to Gmail, scans unread messages, and audits embedded links."""
-    print("=" * 65)
-    print("🛡️ GMAIL AI SECURITY GATEWAY: SCANNING UNREAD MESSAGES")
-    print("=" * 65)
-
-    try:
-        mail = imaplib.IMAP4_SSL(IMAP_SERVER)
-        mail.login(GMAIL_USER, GMAIL_APP_PASS)
-        mail.select("inbox")
-    except Exception as e:
-        print(f"❌ Authentication Failed: {e}")
-        print("💡 Ensure you are using your 16-character App Password, not your regular password.")
-        return
-
-    # Search for UNSEEN (unread) emails
-    status, messages = mail.search(None, 'UNSEEN')
-    email_ids = messages[0].split()
-
-    if not email_ids:
-        print("📭 No unread emails found in Inbox. You're all caught up!")
-        mail.close()
-        mail.logout()
-        return
-
-    print(f"📬 Found {len(email_ids)} unread email(s). Auditing the latest {min(max_emails, len(email_ids))}...\n")
-
-    for e_id in email_ids[-max_emails:]:
-        res, msg_data = mail.fetch(e_id, '(RFC822)')
-        for response_part in msg_data:
-            if isinstance(response_part, tuple):
-                msg = email.message_from_bytes(response_part[1])
-                
-                # Decode Subject
-                subject_raw, encoding = decode_header(msg.get("Subject", "No Subject"))[0]
-                if isinstance(subject_raw, bytes):
-                    subject = subject_raw.decode(encoding if encoding else "utf-8", errors="ignore")
-                else:
-                    subject = subject_raw
-                
-                sender = msg.get("From", "Unknown Sender")
-
-                print("-" * 65)
-                print(f"📨 From: {sender}")
-                print(f"📌 Subject: {subject}")
-
-                # Extract message body
-                body = ""
-                if msg.is_multipart():
-                    for part in msg.walk():
-                        content_type = part.get_content_type()
-                        if content_type in ["text/plain", "text/html"]:
-                            try:
-                                body += part.get_payload(decode=True).decode("utf-8", errors="ignore")
-                            except Exception:
-                                pass
-                else:
-                    try:
-                        body = msg.get_payload(decode=True).decode("utf-8", errors="ignore")
-                    except Exception:
-                        pass
-
-                # Scan for links
-                urls = extract_urls(body)
-                if not urls:
-                    print("   🟢 Verdict: No hyperlinks found in message body (Safe)")
-                    continue
-
-                print(f"   🔍 Embedded Links Found ({len(urls)}):")
-                email_has_threat = False
-
-                for u in urls:
-                    result = audit_url(u)
-                    if result["is_phishing"]:
-                        email_has_threat = True
-                        print(f"   🚨 [THREAT DETECTED] {u}")
-                        print(f"      • Threat Class: {result['threat_type']}")
-                        print(f"      • Risk Score  : {result['risk_score']}% ({result['tier']})")
-                        print(f"      • Reason      : {result.get('summary', 'Deceptive pattern match')}")
-                        print(f"      • Caution     : {result.get('what_not_to_do', ['Do not click'])[0]}")
-                    else:
-                        print(f"   ✅ [SAFE LINK] {u} (Risk: {result['risk_score']}%)")
-
-                if email_has_threat:
-                    print("\n   ⚠️ GATEWAY VERDICT: PHISHING ATTACK IDENTIFIED IN THIS EMAIL.")
-                    print("      RECOMMENDATION: Quarantine email, do not click links or input credentials.")
-                else:
-                    print("\n   ✅ GATEWAY VERDICT: All verified links are clean.")
-
-    mail.close()
-    mail.logout()
-    print("=" * 65)
-    print("🛡️ Scan cycle complete.")
-
-if __name__ == "__main__":
-    scan_inbox(max_emails=5)
+        "tier": "LightGBM ML
